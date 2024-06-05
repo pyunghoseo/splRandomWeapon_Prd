@@ -1,0 +1,828 @@
+https://chatgpt.com/share/3c4cdc3f-96fb-4685-b795-ed9ca65d2874
+
+파이썬으로 디스코드 챗봇을 만들어 놓은 게 있어
+해당은 디스코드내에서 채팅기능과 각종 게임 진행에 필요한 기능이 있는데
+주요한 기능으로 랜덤무기배틀 하는 기능이 내장되어 있어
+해당은 디스코드 채팅창에서 !a 로 실행할 수 있어
+아래는 명령어 예시야
+!a 초코파파 초코TV 마그넷 마이원 치카 율무 국산알타리무 챠미 은하 우밍
+
+해당 명령어 실행시 아래와 같은 결과물이 출력이 되
+
+[출력 예시 - 시작]
+랜덤경기 규칙 : 랭크에리어
+​
+1번 : 초코파파 : 24식 도돌이 우산갑
+2번 : 마그넷 : 블랙 쿼드 호퍼
+3번 : 마이원 : 트라이 스트링거
+4번 : 치카 : 핫 블래스터
+5번 : 율무 : 볼드 마커 네오
+6번 : 국산알타리무 : 오버플로셔
+7번 : 챠미 : 포일 베리어블 롤러
+8번 : 은하 : 와이드 롤러
+
+프로그램 실행시각 : 21-02-59
+관전 당첨 : 우밍, 초코TV
+[출력 예시 - 끝]
+
+이제 해당 출력내용을 입력받아 웹으로 출력하는 프로그램을 개발하려고 해.
+해당은 HTML, CSS, JavaScript, Node.JS 로 개발을 하려고 해.
+
+위 출력물을 입력받는 admin 페이지를 개발해서 주고 웹서비스 주소의 /admin 페이지에서 어드민이 텍스트로 입력하면
+/ 루트 페이지에서는 사용자가 해당 내용을 볼 수 있게 해 주면 되
+    
+/ 루트 페이지의 UI는 내가 PDF 파일을 입력해 줄게
+소스 코드의 내용은 아래와 같아 해당을 참고해서 프로그램을 짜줘:
+
+# 봇츨 허용된 guilds 에서만 추가 가능하도록 변경
+# 20240306 기존에 실수로 폴더 옮기고 트러블슈팅 완료
+# os환경변수 부분에 문제가 있어 소스코드내 하드코딩된 부분 주의 speech_config = speech_sdk.SpeechConfig(subscription='1909a51095c2450e85dcaff1f3704422', region=os.getenv('SPEECH_REGION')) ==> 540행 부분
+# "햄토리반"과 "개나리반"이 포함된 채널에서는 "마그넷", "치카"가 있는 경우만 텔레그램 알람 발송
+import settings
+import discord
+from discord.ext import commands, tasks
+import random as rnd
+from datetime import datetime
+import itertools
+import azure.cognitiveservices.speech as speech_sdk
+from dotenv import load_dotenv
+import os
+import aiofiles
+import aiohttp
+import json
+import asyncio
+import urllib.parse  # Import the urllib.parse module
+import tempfile
+import logging
+import telegram
+
+# s3bot Join 허용된 서버 ID 목록
+allowed_guilds = [
+    '1045007495954964501',  #스플래툰3 카페 서버 ID
+    '1093017139255975996'    #마그넷 서버 ID
+]
+
+# 환경 변수 로드
+load_dotenv()
+
+# 환경 변수 로드 후, SPEECH_KEY와 SPEECH_REGION 값 확인
+print("After loading .env:")
+print("SPEECH_KEY:", os.getenv('SPEECH_KEY'))
+print("SPEECH_REGION:", os.getenv('SPEECH_REGION'))
+##### 해당 os 의 어디에서 변수로 불러오는지 몰라 워크어라운드로 강제로 SPEECH_KEY 를 하드코딩함, 532행
+
+# 마지막 호출 시간을 추적하는 딕셔너리
+last_call_time = {}
+
+# 음성 채널의 사용자를 저장하는 딕셔너리
+voice_channel_users = {}
+
+# bot 객체를 전역 변수로 선언
+bot = None
+
+# bot 객체를 전역 변수로 선언하고 초기화
+intents = discord.Intents.default()
+intents.message_content = True
+bot = commands.Bot(command_prefix="!", intents=intents)
+
+# 전역 변수 추가: 1시간이내 텔레그램 메시지 전송 이력 추적
+telegram_message_sent_this_hour = False
+
+# 각 채널별 마지막 메시지를 추적하기 위한 딕셔너리
+last_telegram_message_per_channel = {}
+
+# Declare global variables
+user_aliases = None
+weapon_groups = None
+
+# 비동기적으로 JSON 파일 불러오기
+async def load_json_file(file_path):
+    async with aiofiles.open(file_path, 'r', encoding='utf-8') as file:
+        return json.loads(await file.read())
+
+# This function is now synchronous
+def load_settings():
+    global user_aliases, weapon_groups
+    with open('user_aliases.json', 'r', encoding='utf-8') as file:
+        user_aliases = json.load(file)
+    with open('weapon_groups.json', 'r', encoding='utf-8') as file:
+        weapon_groups = json.load(file)
+
+logger = settings.logging.getLogger("bot")
+
+# 로깅 함수 추가
+def log_command_usage(ctx, command_name, *args):
+    logger.info(f"Command: {command_name}, User: {ctx.author}, Args: {args if args else 'None'}")
+
+def select_weapons_from_groups(selected_groups, num_weapons):
+    weapons_selected = []
+    for group in selected_groups:
+        weapons_from_group = rnd.choices(weapon_groups[group], k=num_weapons)
+        weapons_selected.extend([(group, weapon) for weapon in weapons_from_group])
+    return weapons_selected
+
+def get_current_time_str():
+    return datetime.now().strftime('%H-%M-%S')
+
+def select_game_rule():
+    game_rules = ['레귤러', '랭크에리어', '랭크타워', '랭크피시', '랭크바지락']
+    selected_rule = rnd.choice(game_rules)
+    return f'랜덤경기 규칙 : {selected_rule}'
+
+def select_random(num_weapons=8):
+    all_weapons = []
+    for group in weapon_groups.values():
+        all_weapons.extend(group)
+    selected_weapons = rnd.choices(all_weapons, k=num_weapons)
+    formatted_weapons = []
+    for i, weapon in enumerate(selected_weapons, start=1):
+        formatted_weapons.append(f'{i}번 : {weapon}')
+    formatted_weapons.append(f"\n프로그램 실행 시각 : {get_current_time_str()}")
+    return '\n'.join(formatted_weapons)
+
+def select_random_with_names(names):
+    # 기존의 nrandom 명령어 로직
+    num_players = len(names)
+    selected_players = names
+
+    if num_players > 8:
+        selected_players = sorted(rnd.sample(names, 8), key=lambda x: names.index(x))
+        spectators = set(names) - set(selected_players)
+    elif num_players < 8:
+        for i in range(1, 9 - num_players):
+            selected_players += (f"공방맨{i}",)
+
+    all_weapons = []
+    for group in weapon_groups.values():
+        all_weapons.extend(group)
+    selected_weapons = rnd.choices(all_weapons, k=len(selected_players))
+
+    for i in range(num_players, 8):
+        selected_weapons[i] = "해당없음"
+
+    formatted_weapons = []
+    for index, (name, weapon) in enumerate(zip(selected_players, selected_weapons), start=1):
+        formatted_weapons.append(f'{index}번 : {name} : {weapon}')
+    formatted_weapons.append(f"\n프로그램 실행시각 : {get_current_time_str()}")
+
+    return '\n'.join(formatted_weapons), spectators if num_players > 8 else None
+
+def select_random_without_duplicates(names):
+    num_players = len(names)
+    selected_players = names
+
+    if num_players > 8:
+        selected_players = sorted(rnd.sample(names, 8), key=lambda x: names.index(x))
+        spectators = set(names) - set(selected_players)
+    elif num_players < 8:
+        for i in range(1, 9 - num_players):
+            selected_players += (f"공방맨{i}",)
+
+    all_weapons = []
+    for group in weapon_groups.values():
+        all_weapons.extend(group)
+
+    if len(all_weapons) < len(selected_players):
+        return "무기가 부족하여 중복 없이 할당할 수 없습니다.", None
+
+    selected_weapons = rnd.sample(all_weapons, k=len(selected_players))
+
+    for i in range(num_players, 8):
+        selected_weapons[i] = "해당없음"
+
+    formatted_weapons = []
+    for index, (name, weapon) in enumerate(zip(selected_players, selected_weapons), start=1):
+        formatted_weapons.append(f'{index}번 : {name} : {weapon}')
+    formatted_weapons.append(f"\n프로그램 실행 시각 : {get_current_time_str()}")
+
+    return '\n'.join(formatted_weapons), spectators if num_players > 8 else None
+
+def select_xrandom():
+    selected_groups = rnd.choices(list(weapon_groups.keys()), k=4)
+    team1_weapons = select_weapons_from_groups(selected_groups, 1)
+    team2_weapons = select_weapons_from_groups(selected_groups, 1)
+    result = []
+    for i, (group, weapon) in enumerate(team1_weapons, start=1):
+        result.append(f'알파팀   {i}번 : {weapon}     : {group} 무기군')
+    result.append('\n')
+    for i, (group, weapon) in enumerate(team2_weapons, start=1):
+        result.append(f'브라보팀 {i}번 : {weapon}     : {group} 무기군')
+    result.append(f"\n프로그램 실행 시각 : {get_current_time_str()}")
+    return '\n'.join(result)
+
+def select_xrandom6():
+    team_1 = [
+    ("초코파파", 1.5), ("MIKI", 1.5), ("은하", 1.3)
+    ]
+    team_2 = [
+    ("mole", 1.5), ("우밍", 1.3), ("뚜비67", 1.5)
+    ]
+    selected_groups = rnd.choices(list(weapon_groups.keys()), k=3)
+    team1_weapons6 = select_weapons_from_groups(selected_groups, 1)
+    team2_weapons6 = select_weapons_from_groups(selected_groups, 1)
+    result = []
+    for i, (group, weapon) in enumerate(team1_weapons6, start=1):
+        result.append(f'{team_1[i-1][0]} : 알파팀 {i}번 : {group} 무기군 : {weapon}')
+    result.append('\n')
+    for i, (group, weapon) in enumerate(team2_weapons6, start=1):
+        result.append(f'{team_2[i-1][0]} : 브라보팀 {i}번 : {group} 무기군 : {weapon}')
+    result.append(f"\n프로그램 실행 시각 : {get_current_time_str()}")
+    return '\n'.join(result)
+
+def select_xrandom8():
+    team_1 = [
+    ("제제", 1), ("연어회챱챱", 1), ("미키", 1), ("초코TV", 1)
+    ]
+    team_2 = [
+    ("해피써니", 1), ("mole", 1), ("우밍", 1), ("은하", 1)
+    ]
+    selected_groups = rnd.choices(list(weapon_groups.keys()), k=4)
+    team1_weapons6 = select_weapons_from_groups(selected_groups, 1)
+    team2_weapons6 = select_weapons_from_groups(selected_groups, 1)
+    result = []
+    for i, (group, weapon) in enumerate(team1_weapons6, start=1):
+        result.append(f'{team_1[i-1][0]} : 알파팀 {i}번 : {group} 무기군 : {weapon}')
+    result.append('\n')
+    for i, (group, weapon) in enumerate(team2_weapons6, start=1):
+        result.append(f'{team_2[i-1][0]} : 브라보팀 {i}번 : {group} 무기군 : {weapon}')
+    result.append(f"\n프로그램 실행 시각 : {get_current_time_str()}")
+    return '\n'.join(result)
+
+def sadari_game(total, selected):
+    if total < selected:
+        return "참여자 수는 선택되는 사람보다 많아야 합니다."
+
+    participants = [f"망멩이 {i+1}" for i in range(total)]
+    chosen = rnd.sample(participants, k=selected)
+
+    result = "\n".join(chosen)
+    return f"선택된 {selected}명의 망멩이:\n{result}"
+
+def calculate_team_strength(team):
+    # 팀의 실력 합을 계산하는 함수
+    strength = sum([player[1] for player in team])
+    return strength
+
+def balance_teams(players):
+    # 가능한 모든 경우의 수를 계산하고, 팀간 실력 차이가 가장 작은 경우를 선택하는 함수
+    min_diff = float('inf')
+    best_teams = None
+    all_teams = []
+    for team_1 in itertools.combinations(players, 4):
+        team_1_strength = calculate_team_strength(team_1)
+        for team_2 in itertools.combinations(players, 4):
+            if set(team_2).isdisjoint(set(team_1)):
+                team_2_strength = calculate_team_strength(team_2)
+                diff = abs(team_1_strength - team_2_strength)
+                all_teams.append((team_1, team_2, diff))
+                if diff < min_diff:
+                    min_diff = diff
+                    best_teams = (team_1, team_2)
+    all_teams_sorted = sorted(all_teams, key=lambda x: x[2])[:3]
+    return best_teams, all_teams_sorted
+
+@commands.command(name='teams', aliases=['team','t'])
+async def teams(ctx, *args):
+    """ Enter 8 player and select teams """  
+    if len(args) != 16:
+        await ctx.send("올바른 입력을 해주세요. 예: !teams 일번 초 이번 중 삼번 초 사번 고 ...")
+        return
+
+    player_data = list(zip(args[::2], args[1::2]))  # [(일번, 초), (이번, 중) ...]
+    players = []
+
+    for name, level in player_data:
+        if level == '초':
+            strength = 1
+        elif level == '중':
+            strength = 1.3
+        elif level == '고':
+            strength = 1.5
+        else:
+            await ctx.send(f"올바르지 않은 실력 입력: {level}")
+            return
+        players.append((name, strength))
+
+    best_teams, all_teams_sorted = balance_teams(players)
+
+    response = []
+    response.append("=== Best3 팀조합 ===")
+
+    for idx, option in enumerate(all_teams_sorted[1:3], start=1):  #팀3개를 출력시 :2부분을 :3으로 변경
+        team_1, team_2, diff = option
+        response.append(f"* 옵션 {idx} *")
+        response.append("[팀 1: 알파팀]")
+        for player in team_1:
+            response.append(f"{player[0]} {player[1]}")
+        response.append("[팀 2: 브라보팀]")
+        for player in team_2:
+            response.append(f"{player[0]} {player[1]}")
+        response.append(f"실력 차이: {diff}\n")
+
+    response.append("=== 최적의 팀조합 ===")
+    team_1, team_2 = best_teams
+    response.append("[팀 1: 알파팀]")
+    for player in team_1:
+        response.append(f"{player[0]} {player[1]}")
+    response.append("[팀 2: 브라보팀]")
+    for player in team_2:
+        response.append(f"{player[0]} {player[1]}")
+    response.append(f"실력 차이: {diff}\n")
+
+    await ctx.send('\n'.join(response))
+
+# 오류 핸들러 함수 추가
+@bot.event
+async def on_command_error(ctx, error):
+    if getattr(ctx, 'handled', False):
+        # 이미 처리한 오류인 경우 무시
+        await ctx.send("이미 처리한 오류인 경우 무시.")
+        return
+
+    if isinstance(error, commands.CommandNotFound):
+        # 사용자가 잘못된 명령어를 입력한 경우
+        logger.error(f"User {ctx.author} entered an invalid command: {ctx.message.content}")
+        await ctx.send("명령어접미사 뒤에 한칸 띄우세요.")
+        ctx.handled = True
+    elif isinstance(error.original, discord.ClientException) and "Already playing audio" in str(error.original):
+        # TTS가 이미 재생 중일 때 발생하는 오류 처리
+        logger.error(f"An error occurred: {error}")
+        await ctx.send("TTS 동시입력 충돌이 발생했어요.")
+        ctx.handled = True
+    elif isinstance(error.original, discord.ClientException) and "Not connected to voice" in str(error.original):
+        # 봇이 음성 채널에 연결되어 있지 않을 때 발생하는 오류 처리
+        logger.error(f"An error occurred: {error}")
+
+        # 사용자가 음성 채널에 있는지 확인
+        if ctx.author.voice:
+            try:
+                # 사용자가 있는 음성 채널에 봇을 연결
+                await ctx.author.voice.channel.connect()
+                await ctx.send(f"{ctx.author.voice.channel.name} 채널에 연결되었습니다.")
+            except discord.ClientException as e:
+                await ctx.send("음성채널 연결오류. 1분뒤에 호출해 주세요.")
+                logger.error(f"Error connecting to voice channel: {e}")
+        else:
+            await ctx.send("음성채널에 다시 Join 후 봇을 불러주세요.")
+        ctx.handled = True
+    else:
+        # 다른 종류의 오류에 대한 처리 (현재는 그대로 로깅)
+        logger.error(f"An error occurred: {error}")
+        await ctx.send("error가 발생했습니다.관리자 확인필요.")
+        ctx.handled = True
+
+
+# run 함수 정의
+def run():
+    global bot
+
+    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s', handlers=[logging.FileHandler("discord_bot.log", encoding='utf-8')])
+    load_settings()
+
+    # httpx 로거에 대한 로깅 레벨을 WARNING으로 설정
+    logging.getLogger("httpx").setLevel(logging.WARNING)
+
+    @bot.event
+    async def on_ready():
+        print(f"s3bot 프로그램 시작 시간: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+        # 현재 접속 중인 모든 디스코드 서버의 이름을 출력
+        for guild in bot.guilds:
+            print(f'Connected to server: {guild.name}')
+        check_time.start()  # 기존 시간 확인 작업 시작
+        check_voice_channels.start()  # 음성 채널 확인 작업 시작
+        keep_alive_message.start() # 텔레그램 keep alive 루프 시작
+        print("check_voice_channels 작업 시작됨")  # 로그 메시지 추가
+
+    @bot.event
+    async def on_guild_join(guild):
+        if guild.id not in allowed_guilds:
+            await guild.leave()
+            print(f"봇이 허용되지 않은 서버에서 나갔습니다: {guild.name} (ID: {guild.id})")
+
+    @bot.event
+    async def on_voice_state_update(member, before, after):
+        global voice_channel_users
+        if member == bot.user and before.channel is not None and after.channel is None:
+            # 봇이 음성 채널에서 연결 해제되었을 때 처리
+            print(f"s3bot has been disconnected from the voice channel: {before.channel.name}")
+        
+        # 음성 채널의 상태 변경 시 사용자 목록 업데이트 및 콘솔 로깅
+        channel_to_update = before.channel if before.channel else after.channel
+        if channel_to_update:
+            all_users = [m.display_name for m in channel_to_update.members]
+            real_users = [m.display_name for m in channel_to_update.members if m.display_name not in ['TTS Bot', 's3bot']]
+            voice_channel_users[channel_to_update.id] = all_users
+            current_real_user_count = len(real_users)
+            
+            # 현재 시간 문자열 가져오기
+            current_time_str = get_current_time_str()
+
+            # 콘솔에 현재 상태 로깅
+            print(f"{current_time_str} - Channel: {channel_to_update.name}, Users: {', '.join(all_users)}, Real Users: {current_real_user_count} - 메세지 발송모듈 호출")
+
+            # 실제 사용자 수 변경에 따른 알람 처리
+            if current_real_user_count >= 1:
+                # "햄토리반"과 "개나리반"이 포함된 채널에서는 "마그넷", "치카"가 있는 경우만 텔레그램 알람 발송
+                if "햄토리반" in channel_to_update.name or "개나리반" in channel_to_update.name or "나쁜어린이반" in channel_to_update.name or "도박신고" in channel_to_update.name or "장미반" in channel_to_update.name or "해바라기반" in channel_to_update.name or "보건실" in channel_to_update.name or "햇님반" in channel_to_update.name:
+                    if any(user in all_users for user in ["마그넷", "치카"]):
+                        await send_telegram_alert(channel_to_update.id, all_users)
+                else:
+                    await send_telegram_alert(channel_to_update.id, all_users)
+            elif before.channel and not after.channel and current_real_user_count == 0:
+                if "햄토리반" in channel_to_update.name or "개나리반" in channel_to_update.name or "나쁜어린이반" in channel_to_update.name or "도박신고" in channel_to_update.name or "장미반" in channel_to_update.name or "해바라기반" in channel_to_update.name or "보건실" in channel_to_update.name or "햇님반" in channel_to_update.name:
+                    if any(user in all_users for user in ["마그넷", "치카"]):
+                        await send_telegram_alert(channel_to_update.id, all_users, last_user_left=True)
+                else:
+                    await send_telegram_alert(channel_to_update.id, all_users, last_user_left=True)
+
+    @bot.command(
+        aliases=['p'],
+        help="This is help",
+        description="This is description",
+        brief="This is brief",
+        enable=True,
+        hidden=True
+    )
+    async def ping(ctx):
+        """ Answers with pong"""
+        log_command_usage(ctx, "ping")  
+        await ctx.send("pong")
+
+    @bot.command(
+        aliases=['g']
+    )
+    async def game(ctx):
+        """ Select a random game rule """
+        log_command_usage(ctx, "game")
+        result = select_game_rule()
+        await ctx.send(result)
+        
+    @bot.command(
+        aliases=['r']
+    )
+    async def random(ctx):
+        """ Assign all-random weapons """       
+        log_command_usage(ctx, "random")  
+        result = select_random()
+        await ctx.send(result)
+
+    @bot.command(aliases=['n'])    
+    async def nrandom(ctx, *names):
+        """ Assign random with name, 8p """
+        log_command_usage(ctx, "nrandom", *names)
+        result, spectators = select_random_with_names(names)
+        await ctx.send(result)
+        if spectators:
+            spectator_msg = f"관전 당첨 : {', '.join(spectators)}"
+            await ctx.send(spectator_msg)
+
+    @bot.command(aliases=['m'])
+    async def mrandom(ctx, *names):
+        """ Assign random, no dup, 8p """
+        log_command_usage(ctx, "mrandom", *names)
+        result, spectators = select_random_without_duplicates(names)
+        await ctx.send(result)
+        if spectators:
+            spectator_msg = f"관전 당첨 : {', '.join(spectators)}"
+            await ctx.send(spectator_msg)
+
+    @bot.command(
+        aliases=['x','xr']
+    )
+    async def xrandom(ctx):
+        """ Select X-match random weapons """  
+        log_command_usage(ctx, "xrandom")        
+        result = select_xrandom()
+        await ctx.send(result)
+
+    @bot.command(
+      aliases=['x6','xr6']
+    )
+    async def xrandom6(ctx):
+        """ xrandom for Static 6 members """
+        log_command_usage(ctx, "xrandom6")    
+        result = select_xrandom6()
+        await ctx.send(result)
+
+    @bot.command(
+      aliases=['x8','xr8']
+    )
+    async def xrandom8(ctx):
+        """ xrandom for Static 8 members """  
+        log_command_usage(ctx, "xrandom8")  
+        result = select_xrandom8()
+        await ctx.send(result)
+
+    @bot.command(
+      aliases=['s']
+    )
+    async def sadari(ctx, total: int, selected: int):
+        """ Play the sadari game !s 10 2 """        
+        log_command_usage(ctx, "sadari", total, selected)  
+        result = sadari_game(total, selected)
+        await ctx.send(result)
+
+    @bot.command(aliases=['!', '@', '#', '$', '%', '^', '&', '*', '(', ')'])
+    async def speak(ctx, *, message: str):
+        """ TTS speak, using prefix !! etc. """
+        log_command_usage(ctx, "speak", message)  # 로깅 추가
+
+        if not ctx.author.voice:
+            await ctx.send("음성 채널에 접속해야 사용 가능합니다.")
+            return
+
+        channel = ctx.author.voice.channel
+
+        if ctx.voice_client is None:
+            await channel.connect()
+        elif ctx.voice_client.channel != channel:
+            await ctx.voice_client.move_to(channel)
+
+        if not ctx.voice_client:
+            await ctx.send("음성 채널에 연결할 수 없습니다.")
+            return
+
+        last_call_time[channel.id] = datetime.now()
+
+
+        # 사운드 파일 재생 로직 추가
+        if message.isdigit():  # 사용자가 숫자만 입력한 경우, 사운드 파일 재생
+            sound_number = message
+            sound_file_path = f"C:\\Users\\suser\\Music\\{sound_number}.MP3"
+            try:
+                audio_source = discord.FFmpegPCMAudio(sound_file_path)
+                if not ctx.voice_client.is_playing():
+                    ctx.voice_client.play(audio_source)
+                else:
+                    await ctx.send("다른 사운드가 재생 중입니다.")
+                return  # 사운드 재생 후 함수 종료
+            except Exception as e:
+                await ctx.send(f"사운드 재생 중 오류 발생: {e}")
+                return
+
+        # 사용자 이름 또는 ID 추가
+        display_name = ctx.author.display_name
+        name_to_speak = user_aliases.get(display_name, display_name)
+
+        # 사용자 소개 메시지 정의
+        user_intro = f"{name_to_speak} : "
+
+        # 특정 문자열 변환
+        modified_message = message.replace("ㅋ", "크").replace("ㅎ", "흐").replace("ㅜㅜ", "눈물쥴쥴").replace("ㅠㅠ", "눈물쭐쭐").replace("ㅠ", "눙물").replace("ㅜ", "한쪽눈물")
+        full_message = user_intro + modified_message
+
+        # Microsoft Azure TTS 설정
+        # speech_config = speech_sdk.SpeechConfig(subscription=os.getenv('SPEECH_KEY'), region=os.getenv('SPEECH_REGION'))
+        speech_config = speech_sdk.SpeechConfig(subscription='d5ad941cc6264f5da1453ddc1ee2f82d', region='koreacentral')      #subscription 부분은 Speech서비스의 Key값임 
+
+        voice_name_map = {
+            "!": "ko-KR-SeoHyeonNeural",
+            "@": "ko-KR-InJoonNeural",
+            "#": "ko-KR-SunHiNeural",
+            "$": "ko-KR-YuJinNeural",
+            "%": "ko-KR-SoonBokNeural",
+            "^": "ko-KR-JiMinNeural",
+            "&": "ko-KR-BongJinNeural",
+            "*": "ko-KR-GookMinNeural",
+            "(": "ko-KR-HyunsuNeural"
+        }
+        selected_voice = voice_name_map.get(ctx.invoked_with, "ko-KR-SeoHyeonNeural")
+        speech_config.speech_synthesis_voice_name = selected_voice
+
+        speech_synthesizer = speech_sdk.SpeechSynthesizer(speech_config)
+
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.wav') as audio_file:    #mp3 파일 저장위치 C:\Users\suser\AppData\Local\Temp\2
+            result = speech_synthesizer.speak_text_async(full_message).get()
+            stream = speech_sdk.AudioDataStream(result)
+            stream.save_to_wav_file(audio_file.name)
+
+        source = discord.FFmpegPCMAudio(audio_file.name)
+        ctx.voice_client.play(source)
+
+        ctx.handled = True
+
+    @bot.command(aliases=['a'])
+    async def combined(ctx, *names):
+        """ Execute !g and then !nrandom """
+        log_command_usage(ctx, "combined", *names)
+        
+        # !g 명령 실행
+        result_g = select_game_rule()
+        await ctx.send(result_g)
+
+        # 빈 줄 추가
+        await ctx.send("\u200B")
+
+        # !nrandom 명령 실행
+        result_n, spectators = select_random_with_names(names)
+        await ctx.send(result_n)
+        if spectators:
+            spectator_msg = f"관전 당첨 : {', '.join(spectators)}"
+            await ctx.send(spectator_msg)
+    
+    @bot.command()
+    async def 파파(ctx):
+        help_text = (
+            "**자주 쓰는 명령어 목록:**\n"
+            "- !a : 랜덤경기 규칙을 정해 주고 8명의 플레이어에게 중복 없이 무작위 무기를 할당합니다.\n"
+            "8명이 안될경우 공방맨 포함 지정해주고, 8명이 넘을 경우 관전자도 지정. \n"
+            "사용예) !a 초코파파 초코TV 마그넷 마이원 치카 율무 국산알타리무 챠미 은하 우밍\n\n"
+            "- !g : 레귤러를 포함하여 랜덤경기 규칙을 정해서 출력합니다\n"
+            "사용예) !g\n\n"
+            "- !m : 입력한 8명의 플레이어에게 중복 없이 무작위 무기를 할당합니다. !mrandom 동일기능 \n"
+            "사용예) !m 초코파파 초코TV 마그넷 마이원 치카 율무 국산알타리무 챠미\n\n"
+            "- !n : 입력한 8명의 플레이어에게 무작위 무기를 할당합니다. 중복 허용. !n random 동일기능\n"
+            "사용예) !n 초코파파 초코TV 마그넷 마이원 치카 율무 국산알타리무 챠미\n\n"
+            "- !s : 사다리 게임을 진행합니다. (!s 10 2 형식으로 사용). !sadari 동일기능\n"
+            "사용예) !s 10 2\n\n"
+            "- !! : TTS(Text To Speech) 기능을 사용하여 메시지를 읽어줍니다. !speak 동일기능\n"
+            "사용예) !! 안녕하세요 초코파파입니다\n\n"            
+            "- !t : 8명의 플레이어를 입력하여 팀을 구성합니다. !teams 동일기능"
+            "사용예) !t 초코TV 고 연어회챱챱 고 미키 고 해피써니 중 초코파파 고 mole 고 우밍 중 은하 중\n\n"
+            "- !! 숫자 : 사운드보드 기능\n"
+            "사용예) !! 1\n\n"
+            "1_원짱.MP3\n"
+            "2_에헤이조졌네이거.mp3\n"
+            "3_지금누가 기침.mp3\n"
+            "4_가벼렷.mp3\n"
+            "5_살려주세요.mp3\n"
+            "6_궁금하면500원.mp3\n"
+            "7_이뭔개소리야.mp3\n"
+            "8_어림도없다.mp3\n"
+            "9_알타님요청.mp3\n"
+            "10_안돼에.mp3\n"
+            "11_아아내눈.mp3\n"
+            "12_먼소리지_먼소리야.mp3\n"
+            "13_도대체왜그래.mp3\n"            
+            "14_머였지.mp3\n"  
+            "15_다이다이.mp3\n"  
+        )
+        await ctx.send(help_text)
+
+    
+    bot.add_command(teams)
+    bot.add_listener(on_command_error)
+
+    # 봇 실행
+    bot.run(settings.DISCORD_API_SECRET, root_logger=True)
+
+# 디스코드 봇 음성채널에 30분이상 아무런 TTS호출이 없으면 자동 disconnect
+@tasks.loop(seconds=60)
+async def check_time():
+    global telegram_message_sent_this_hour
+    current_time = datetime.now()
+    if current_time.minute == 0 and current_time.second == 0:
+        telegram_message_sent_this_hour = False
+    for guild in bot.guilds:
+        for channel in guild.voice_channels:
+            if channel.id in last_call_time:
+                time_diff = current_time - last_call_time[channel.id]
+                if time_diff.total_seconds() >= 1800:  # 30분 이상
+                    if channel.members:
+                        for member in channel.members:
+                            if member.bot and member.display_name == "s3bot":
+                                await member.move_to(None)
+                                print(f"s3bot disconnected from {channel.name} due to inactivity at {current_time.strftime('%Y-%m-%d %H:%M:%S')}")
+    # 매 정시마다 TTS 호출 여부 확인
+    if current_time.minute == 0:
+        last_tts_call = max(last_call_time.values(), default=None)
+        if last_tts_call and (current_time - last_tts_call).total_seconds() >= 3600:
+            # 마지막 TTS 호출 후 1시간 동안 TTS 호출이 없는 경우
+            await keep_alive_message()
+        telegram_message_sent_this_hour = False
+
+# 음성채널 접속자 사용자명, 총 유저수 파악
+@tasks.loop(seconds=60)
+async def check_voice_channels():
+    global voice_channel_users
+    try:
+        current_time_str = datetime.now().strftime('%H:%M:%S')  # 현재 시간을 문자열로 변환    %m-%d %H:%M
+        for channel_id, users in voice_channel_users.items():
+            channel = bot.get_channel(channel_id)
+            if channel and users:  # 사용자 목록이 비어 있지 않은 경우에만 출력
+                continue
+                # print(f"{current_time_str} - Channel: {channel.name}, Users: {users}, Count: {len(users)}")
+
+    except Exception as e:
+        print(f"{current_time_str} - check_voice_channels 작업 중 오류 발생: {e}")
+
+# 텔레그램에 keep alive 메세지 전송
+@tasks.loop(minutes=3)
+async def keep_alive_message():
+    global telegram_message_sent_this_hour
+    current_time = datetime.now()
+
+    # 한 시간마다 메시지가 전송되지 않았다면 'Keep Alive' 메시지를 전송
+    if not telegram_message_sent_this_hour:
+        bot_token = os.getenv('TELEGRAM_BOT_TOKEN')
+        chat_id = "YOUR_CHAT_ID"  # 실제 챗 ID로 변경
+        telegram_bot = telegram.Bot(token=bot_token)
+
+        message_parts = ["## 세션유지 및 채널정보 ##"]
+        for channel_id, users in voice_channel_users.items():
+            channel = bot.get_channel(channel_id)
+            if channel and users:  # 사용자 목록이 비어 있지 않은 경우에만 처리
+                channel_name = channel.name
+                real_users = [name for name in users if name not in ['TTS Bot', 's3bot']]
+                num_real_users = len(real_users)
+                users_str = ', '.join(real_users)
+                message_part = f"## {channel_name} {num_real_users}명 : {users_str} ##"
+                message_parts.append(message_part)
+
+        message = "\n".join(message_parts)
+
+        try:
+            updates = await telegram_bot.get_updates()
+            chat_id = updates[-1].message.chat.id if updates else chat_id
+            await telegram_bot.send_message(chat_id=chat_id, text=message)
+            print("세션 유지 메시지와 사용자 정보가 발송되었습니다.")
+            print(message)
+            telegram_message_sent_this_hour = True  # 메시지 전송 후 변수 업데이트
+        except Exception as e:
+            print(f"Keep alive message error: {e}")
+        
+        telegram_message_sent_this_hour = True
+
+    # 다음 정각에 메시지 전송 상태를 초기화하기 위해 현재 시간을 확인
+    if current_time.minute == 0 and current_time.second < 10:  # 정각 근처에 초기화
+        telegram_message_sent_this_hour = False
+
+# 2명 이상 실제 사용자가 음성채널 join시 텔레그램으로 메세지 발송
+async def send_telegram_alert(channel_id, all_user_names, last_user_left=False):
+    global telegram_message_sent_this_hour
+    global last_telegram_message_per_channel
+
+    channel = bot.get_channel(channel_id)
+    channel_name = channel.name if channel else "Unknown Channel"
+
+    real_users = [name for name in all_user_names if name not in ['TTS Bot', 's3bot']]
+    num_real_users = len(real_users)
+
+    if num_real_users >= 1 or last_user_left:
+        bot_token = os.getenv('TELEGRAM_BOT_TOKEN')
+        chat_id = "YOUR_CHAT_ID"
+        telegram_bot = telegram.Bot(token=bot_token)
+
+        if last_user_left:
+            message = f"'{channel_name}' 0명"
+        else:
+            users_str = ', '.join(all_user_names)
+            message = f"'{channel_name}' {num_real_users}명 : {users_str}"
+
+        # 변경: 채널별 마지막 메시지 확인
+        last_message = last_telegram_message_per_channel.get(channel_name, "")
+        if message != last_message:
+            try:
+                updates = await telegram_bot.get_updates()
+                chat_id = updates[-1].message.chat.id if updates else chat_id
+                await telegram_bot.send_message(chat_id=chat_id, text=message)
+                telegram_message_sent_this_hour = True
+
+                last_telegram_message_per_channel[channel_name] = message  # 메시지 저장
+            except Exception as e:
+                print(f"Telegram message error: {e}")
+        # else:
+            # print("중복된 텔레그램 메시지는 발송되지 않습니다.")
+
+async def play_sound(ctx, sound_number):
+    try:
+        # 사운드 파일 경로 설정
+        sound_file_path = f"C:\\Users\\suser\\Music\\{sound_number}_wonJJang.wav"
+        # 음성 채널 접속 확인 및 접속
+        if ctx.voice_client is None:
+            if ctx.author.voice:
+                await ctx.author.voice.channel.connect()
+            else:
+                await ctx.send("음성 채널에 접속해야 사용 가능합니다.")
+                return
+        elif ctx.voice_client.channel != ctx.author.voice.channel:
+            await ctx.voice_client.move_to(ctx.author.voice.channel)
+
+        # 사운드 파일 재생
+        audio_source = discord.FFmpegPCMAudio(sound_file_path)
+        if not ctx.voice_client.is_playing():
+            ctx.voice_client.play(audio_source)
+        else:
+            await ctx.send("다른 사운드가 재생 중입니다.")
+    except Exception as e:
+        await ctx.send(f"사운드 재생 중 오류 발생: {e}")
+
+
+# 디스코드 봇 시작 메인 함수
+async def main():
+    load_settings()  # Load settings synchronously
+    # Setup and run your bot here
+    intents = discord.Intents.default()
+    intents.message_content = True
+    bot = commands.Bot(command_prefix="!", intents=intents)
+
+    # Setup your bot (add commands, event listeners, etc.)
+
+    await bot.start(settings.DISCORD_API_SECRET, root_logger=True)
+
+# 파이썬 코드 시작 main
+if __name__ == "__main__":
+    run()
+	
+PDF는 업로드 해 줄게
+	
