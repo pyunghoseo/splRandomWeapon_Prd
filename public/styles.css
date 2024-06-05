@@ -1,5 +1,6 @@
 body {
     font-family: Arial, sans-serif;
+    font-weight: bold; /* 일반 글씨를 굵게 표시 */
     margin: 0;
     padding: 20px;
     background-color: #f4f4f4;
@@ -36,9 +37,32 @@ li {
     margin: 5px 0;
 }
 button {
-    padding: 10px 20px;
+    padding: 20px 40px;  /* 세로 크기를 두 배로 늘리고, 버튼이 더 커지도록 함 */
     background-color: #333;
     color: #fff;
     border: none;
     cursor: pointer;
+    font-size: 1.2em;  /* 글자를 더 크게 함 */
+}
+button:hover {
+    background-color: #555;
+}
+.admin-link {
+    display: block;  /* 블록 요소로 설정하여 전체 너비를 차지하게 함 */
+    margin-top: 20px;
+    padding: 20px 40px;  /* 세로 크기를 두 배로 늘리고, 버튼이 더 커지도록 함 */
+    background-color: #333;
+    color: #fff;
+    text-decoration: none;
+    border-radius: 5px;
+    font-size: 1.2em;  /* 글자를 더 크게 함 */
+    text-align: center;
+}
+.admin-link:hover {
+    background-color: #555;
+}
+.buttons {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
 }
