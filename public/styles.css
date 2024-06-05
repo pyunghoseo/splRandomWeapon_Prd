@@ -27,7 +27,7 @@ h1 {
     width: 45%;
 }
 .column h2, .column h3, .column p, .column ul, .column li {
-    font-size: 1.2em; /* 규칙, 순번, 관전, 시각 열의 모든 글씨 크기 설정 */
+    font-size: 1.5em; /* 규칙, 순번, 관전, 시각 열의 모든 글씨 크기 설정 */
 }
 ul {
     list-style-type: none;
@@ -42,7 +42,7 @@ button {
     color: #fff;
     border: none;
     cursor: pointer;
-    font-size: 1.2em;  /* 글자를 더 크게 함 */
+    font-size: 1.5em;  /* 글자를 더 크게 함 */
 }
 button:hover {
     background-color: #555;
@@ -55,7 +55,7 @@ button:hover {
     color: #fff;
     text-decoration: none;
     border-radius: 5px;
-    font-size: 1.2em;  /* 글자를 더 크게 함 */
+    font-size: 1.5em;  /* 글자를 더 크게 함 */
     text-align: center;
 }
 .admin-link:hover {
