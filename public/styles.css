@@ -14,23 +14,32 @@ body {
     font-weight: bold; /* 일반 글씨를 굵게 표시 */
     margin: 0;
     padding: 20px;
-    background-color: #003049; /* 배경색을 어두운 색으로 설정 */
-    color: #003049; /* 기본 글자색을 모두 어두운 색으로 설정 */
+    background-color: #333745; /* 배경색을 어두운 색으로 설정 */
+    color: #333745; /* 기본 글자색을 모두 어두운 색으로 설정 */
 }
 h1 {
-    color: #eae2b7; /* 제목 글자 색상 */
+    color: #EEF5DB; /* 제목 글자 색상 */
     font-size: 3em; /* 제목 글자 크기 */
 }
+h1 .cafe-link {
+    font-size: 0.5em; /* 링크의 글자 크기 설정 */
+    color: #EEF5DB; /* 링크 글자 색상 */
+    text-decoration: none;
+    margin-left: 20px;
+}
+h1 .cafe-link:hover {
+    text-decoration: underline;
+}
 .container {
-    background: #FCBF49; /* 컨테이너 배경색을 밝은 색으로 설정 */
+    background: #C7EFcf; /* 컨테이너 배경색을 밝은 색으로 설정 */
     padding: 20px;
-    border: 1px solid #EAE2B7; /* 경계선 색상을 밝은 색으로 설정 */
+    border: 1px solid #EEF5DB; /* 경계선 색상을 밝은 색으로 설정 */
 }
 .section {
     margin-bottom: 20px;
     display: flex;
     justify-content: space-between;
-    border-bottom: 1px solid #EAE2B7; /* 경계선 색상을 밝은 색으로 설정 */
+    border-bottom: 1px solid #EEF5DB; /* 경계선 색상을 밝은 색으로 설정 */
     padding-bottom: 10px;
 }
 .section:last-child {
@@ -41,7 +50,7 @@ h1 {
 }
 .column h2, .column h3, .column p, .column ul, .column li {
     font-size: 1.4em; /* 모든 글씨 크기를 1.4em으로 설정 */
-    color: #003049; /* 컬럼 내부 텍스트 색상을 어두운 색으로 설정 */
+    color: #333745; /* 컬럼 내부 텍스트 색상을 어두운 색으로 설정 */
 }
 ul {
     list-style-type: none;
@@ -52,28 +61,28 @@ li {
 }
 button {
     padding: 20px 40px;  /* 세로 크기를 두 배로 늘리고, 버튼이 더 커지도록 함 */
-    background-color: #D62828; /* 버튼 배경색 */
-    color: #EAE2B7; /* 버튼 글자색 */
+    background-color: #E63462; /* 버튼 배경색 */
+    color: #EEF5DB; /* 버튼 글자색 */
     border: none;
     cursor: pointer;
     font-size: 1.4em;  /* 글자를 더 크게 함 */
 }
 button:hover {
-    background-color: #F77F00; /* 버튼 호버 시 배경색 */
+    background-color: #FE5F55; /* 버튼 호버 시 배경색 */
 }
 .admin-link {
     display: block;  /* 블록 요소로 설정하여 전체 너비를 차지하게 함 */
     margin-top: 20px;
     padding: 20px 40px;  /* 세로 크기를 두 배로 늘리고, 버튼이 더 커지도록 함 */
-    background-color: #D62828; /* 링크 배경색 */
-    color: #EAE2B7; /* 링크 글자색 */
+    background-color: #E63462; /* 링크 배경색 */
+    color: #EEF5DB; /* 링크 글자색 */
     text-decoration: none;
     border-radius: 5px;
     font-size: 1.4em;  /* 글자를 더 크게 함 */
     text-align: center;
 }
 .admin-link:hover {
-    background-color: #F77F00; /* 링크 호버 시 배경색 */
+    background-color: #FE5F55; /* 링크 호버 시 배경색 */
 }
 .buttons {
     display: flex;
