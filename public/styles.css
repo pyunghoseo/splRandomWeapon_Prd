@@ -52,13 +52,12 @@ h1 .cafe-link:hover {
     font-size: 1.4em; /* 모든 글씨 크기를 1.4em으로 설정 */
     color: #333745; /* 컬럼 내부 텍스트 색상을 어두운 색으로 설정 */
 }
-ul, ol {
+ul {
+    list-style-type: none;
     padding: 0;
-    text-align: left; /* 공지 목록을 왼쪽 정렬 */
 }
 li {
     margin: 5px 0;
-    text-align: left; /* 항목을 왼쪽 정렬 */
 }
 button {
     padding: 20px 40px;  /* 세로 크기를 두 배로 늘리고, 버튼이 더 커지도록 함 */
@@ -97,7 +96,7 @@ textarea#notice, textarea#inputText {
     border: 1px solid #EEF5DB;
     background-color: #C7EFcf;
     color: #333745;
-    font-size: 1.2em;  /* 글자 크기 변경 */
+    font-size: 1.0em;  /* 글자 크기 변경 */
     font-family: 'Nanum Gothic', Arial, sans-serif;
     resize: none;
     box-sizing: border-box;
@@ -109,7 +108,7 @@ ol#notice {
     border: 1px solid #EEF5DB;
     background-color: #C7EFcf;
     color: #333745;
-    font-size: 1.2em;  /* 글자 크기 */
+    font-size: 1.0em;  /* 글자 크기 */
     font-family: 'Nanum Gothic', Arial, sans-serif;
     box-sizing: border-box;
     text-align: left; /* 공지 내용을 왼쪽 정렬 */
