@@ -1,0 +1,24 @@
+mv splRandomWeapon_Prd splRandomWeapon_Prd_20240615
+git clone https://github.com/pyunghoseo/splRandomWeapon_Prd
+
+cd splRandomWeapon_Prd
+sudo pm2 restart app.js
+sudo systemctl restart nginx
+sudo node app.js
+sudo netstat -napt
+
+*애플리케이션 실행
+sudo node app.js
+
+
+*백그라운드에서 실행 (PM2 사용 추천)
+sudo pm2 start app.js
+		sudo pm2 start app.js --name "discord-bot-web"
+sudo pm2 startup
+sudo pm2 save
+sudo netstat -napt
+
+======================
+mv splRandomWeapon_Prd splRandomWeapon_Prd_20240615
+git clone https://github.com/pyunghoseo/splRandomWeapon_Prd
+cd splRandomWeapon_Prd
