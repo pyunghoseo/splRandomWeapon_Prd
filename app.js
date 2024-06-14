@@ -1,6 +1,7 @@
 const express = require('express');
 const bodyParser = require('body-parser');
 const path = require('path');
+const fs = require('fs');
 
 const app = express();
 
@@ -22,6 +23,16 @@ let discordOutput = {
         time: ''
     }
 };
+
+// 최초 공지 내용을 읽어옵니다.
+let notice = [];
+fs.readFile(path.join(__dirname, 'noti.txt'), 'utf8', (err, data) => {
+    if (err) {
+        console.error('Error reading noti.txt:', err);
+    } else {
+        notice = data.split('\n').map(line => line.trim()).filter(line => line !== '');
+    }
+});
 
 function parseInput(input) {
     const lines = input.split('\n');
@@ -47,7 +58,7 @@ function parseInput(input) {
 }
 
 app.get('/', (req, res) => {
-    res.render('index', { output: discordOutput });
+    res.render('index', { output: discordOutput, notice: notice });
 });
 
 app.get('/admin', (req, res) => {
@@ -62,6 +73,20 @@ app.post('/admin', (req, res) => {
     discordOutput.current = discordOutput.next;
     // 새로운 데이터를 next로 할당
     discordOutput.next = newOutput;
+
+    res.redirect('/');
+});
+
+app.post('/update-notice', (req, res) => {
+    const newNotice = req.body.noticeText;
+    notice = newNotice.split('\n').map(line => line.trim()).filter(line => line !== '');
+
+    // 공지사항을 파일에 저장
+    fs.writeFile(path.join(__dirname, 'noti.txt'), newNotice, 'utf8', (err) => {
+        if (err) {
+            console.error('Error writing to noti.txt:', err);
+        }
+    });
 
     res.redirect('/');
 });

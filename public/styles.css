@@ -52,12 +52,13 @@ h1 .cafe-link:hover {
     font-size: 1.4em; /* 모든 글씨 크기를 1.4em으로 설정 */
     color: #333745; /* 컬럼 내부 텍스트 색상을 어두운 색으로 설정 */
 }
-ul {
-    list-style-type: none;
+ul, ol {
     padding: 0;
+    text-align: left; /* 공지 목록을 왼쪽 정렬 */
 }
 li {
     margin: 5px 0;
+    text-align: left; /* 항목을 왼쪽 정렬 */
 }
 button {
     padding: 20px 40px;  /* 세로 크기를 두 배로 늘리고, 버튼이 더 커지도록 함 */
@@ -88,4 +89,33 @@ button:hover {
     display: flex;
     justify-content: space-between;
     align-items: center;
+}
+textarea#notice, textarea#inputText {
+    width: 100%;
+    height: 450px; /* 세로 크기를 현재 크기의 3배로 설정 */
+    padding: 10px;
+    border: 1px solid #EEF5DB;
+    background-color: #C7EFcf;
+    color: #333745;
+    font-size: 1.2em;  /* 글자 크기 변경 */
+    font-family: 'Nanum Gothic', Arial, sans-serif;
+    resize: none;
+    box-sizing: border-box;
+    text-align: left; /* 텍스트 박스를 왼쪽 정렬 */
+}
+ol#notice {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid #EEF5DB;
+    background-color: #C7EFcf;
+    color: #333745;
+    font-size: 1.2em;  /* 글자 크기 */
+    font-family: 'Nanum Gothic', Arial, sans-serif;
+    box-sizing: border-box;
+    text-align: left; /* 공지 내용을 왼쪽 정렬 */
+    list-style-position: inside; /* 숫자를 텍스트 박스 내부로 위치시킴 */
+    padding-left: 20px; /* 텍스트와 숫자 사이의 간격을 조정 */
+}
+ol#notice li {
+    text-align: left; /* 공지 항목을 왼쪽 정렬 */
 }

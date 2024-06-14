@@ -63,6 +63,14 @@
             <a href="/admin" class="admin-link">Admin 페이지로</a>
             <button onclick="refreshPage()">갱신</button>
         </div>
+        <div class="section">
+            <h2>공지</h2>
+            <ol id="notice">
+                <% notice.forEach((line, index) => { %>
+                    <li><%= line %></li>
+                <% }) %>
+            </ol>
+        </div>
     </div>
     <script src="/scripts.js"></script>
 </body>

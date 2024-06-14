@@ -1,0 +1,131 @@
+Azure VM에 변경된 웹 애플리케이션을 배포하는 과정을 단계별로 설명해드리겠습니다.
+
+1. 로컬에서 코드 업데이트
+먼저, 로컬에서 프로젝트 파일을 업데이트합니다. index.ejs와 styles.css 파일의 변경 사항을 반영합니다.
+
+2. Azure VM에 SSH로 접속
+Azure VM에 SSH를 통해 접속합니다. Azure 포털에서 VM의 공용 IP 주소를 확인하고, 터미널에서 다음 명령어를 실행합니다:
+
+sh
+코드 복사
+ssh <username>@<VM_IP_Address>
+3. 프로젝트 파일 업로드
+로컬에서 업데이트된 파일을 Azure VM으로 전송합니다. 다음 명령어를 사용하여 scp 명령어로 파일을 전송합니다:
+
+sh
+코드 복사
+scp -r /path/to/local/project <username>@<VM_IP_Address>:/path/to/remote/project
+4. 프로젝트 디렉토리로 이동
+Azure VM에 접속한 후, 프로젝트 디렉토리로 이동합니다:
+
+sh
+코드 복사
+cd /path/to/remote/project
+5. Node.js 및 npm 설치 확인
+Node.js와 npm이 설치되어 있는지 확인합니다. 설치되어 있지 않다면 다음 명령어로 설치합니다:
+
+sh
+코드 복사
+sudo apt update
+sudo apt install nodejs npm -y
+6. 프로젝트 종속성 설치
+프로젝트 디렉토리에서 package.json 파일이 있는 위치로 이동하여 종속성을 설치합니다:
+
+sh
+코드 복사
+npm install
+7. 서버 실행
+서버를 실행합니다. app.js 파일이 있는 위치에서 다음 명령어를 실행합니다:
+
+sh
+코드 복사
+node app.js
+서버가 백그라운드에서 실행되도록 pm2와 같은 프로세스 매니저를 사용할 수도 있습니다:
+
+sh
+코드 복사
+sudo npm install -g pm2
+pm2 start app.js
+pm2 save
+pm2 startup
+8. 방화벽 규칙 설정
+Azure 포털에서 VM의 네트워크 설정으로 이동하여 HTTP 및 HTTPS 트래픽을 허용하는 방화벽 규칙을 추가합니다.
+
+9. 도메인 연결
+구매한 도메인을 Azure VM의 IP 주소와 연결합니다. 도메인 제공 업체의 DNS 설정에서 A 레코드를 사용하여 도메인을 Azure VM의 공용 IP 주소로 설정합니다.
+
+10. 변경 사항 확인
+브라우저에서 도메인 또는 Azure VM의 IP 주소로 접속하여 웹 애플리케이션이 올바르게 배포되었는지 확인합니다.
+
+이 과정을 통해 변경된 내용을 Azure VM에 배포할 수 있습니다. 문제가 발생하면 로그 파일을 확인하여 디버깅할 수 있습니다.
+
+
+
+
+
+==================
+1. package.json 파일 확인
+프로젝트 디렉토리에 package.json 파일이 있는지 확인합니다. package.json 파일은 프로젝트의 종속성을 정의합니다.
+
+2. npm install 명령 실행
+package.json 파일이 있는 디렉토리에서 다음 명령어를 실행하여 종속성을 설치합니다:
+
+sh
+코드 복사
+npm install
+3. express 설치
+express가 설치되어 있지 않은 경우 다음 명령어를 실행하여 설치할 수 있습니다:
+
+sh
+코드 복사
+npm install express
+4. 서버 실행
+다시 서버를 실행합니다:
+
+sh
+코드 복사
+node app.js
+이제 단계별로 진행하여 문제를 해결해보세요.
+
+종합적인 과정
+Azure VM에 접속
+
+sh
+코드 복사
+ssh <username>@<VM_IP_Address>
+프로젝트 디렉토리로 이동
+
+sh
+코드 복사
+cd /path/to/remote/project
+종속성 설치
+
+sh
+코드 복사
+npm install
+서버 실행
+
+sh
+코드 복사
+node app.js
+package.json 파일 예시
+아직 package.json 파일이 없다면 다음과 같이 작성할 수 있습니다:
+
+json
+코드 복사
+{
+  "name": "splatoon3-random-battle",
+  "version": "1.0.0",
+  "description": "Splatoon 3 Random Battle",
+  "main": "app.js",
+  "scripts": {
+    "start": "node app.js"
+  },
+  "dependencies": {
+    "express": "^4.17.1",
+    "ejs": "^3.1.6"
+  }
+}
+이 파일을 프로젝트 루트 디렉토리에 저장한 후, npm install 명령어를 실행하면 필요한 모든 종속성을 설치할 수 있습니다.
+
+이 과정을 통해 필요한 모듈을 설치하고 서버를 실행할 수 있습니다. 문제가 발생하면 오류 메시지를 참고하여 추가적인 조치를 취할 수 있습니다.

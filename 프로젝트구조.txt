@@ -1,0 +1,9 @@
+discord-bot-web/
+├── public/
+│   ├── scripts.js
+│   └── styles.css
+├── views/
+│   ├── admin.ejs
+│   └── index.ejs
+├── app.js
+└── package.json
